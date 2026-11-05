@@ -336,7 +336,7 @@ SX.append((starts[0] + .05, sfx.shimmer(.75, .30), 1.0, 0))
 SX.append((starts[0] + .92, sfx.ding(1568, 1.8, .3), .8, 0))
 SX.append((starts[0] + 1.32, sfx.tick(1200), .9, 0))
 # Filigrane discret (logo) sur tous les plans intérieurs / extérieurs
-add_ev(1, .3, starts[15] - starts[1] - .1, logo_layer(170, glow=True), 824, 1495, "rise", left=True)
+add_ev(1, .3, starts[15] - starts[1] - .1, logo_layer(170, glow=True), 824, 1775, "rise", left=True)
 
 # Plan 2 : piscine privée
 t = add_ev(1, .45, 2.0, chip("pool", "PISCINE PRIVÉE"), 500, 1440, "pop"); SX.append((t, sfx.pop(640), 1, 0))
