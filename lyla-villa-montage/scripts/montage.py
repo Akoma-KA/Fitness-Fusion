@@ -5,7 +5,19 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 sys.path.insert(0, os.path.dirname(__file__))
 import sfx
 
-W, H, FPS = 1080, 1920, 30
+FMT = os.environ.get("FMT", "9x16")          # 9x16 (Reels/Stories/TikTok) | 4x5 (Facebook fil d'actualité)
+CTA = os.environ.get("CTA", "1") == "1"      # mention "Réservation directe..." + lien sur le dernier plan
+W, H, FPS = (1080, 1350, 30) if FMT == "4x5" else (1080, 1920, 30)
+if H == 1920:
+    P = dict(i_logo_w=520, i_logo_y=520, i_tag=1060, i_title=1190, i_title_s=176, i_sub=1340, wm_y=1775,
+             chip1_y=1440, chip_y=440, label_y=1470, o_logo_w=540, o_logo_y=480, o_title=790, o_title_s=132,
+             rows_y0=935, rows_dy=138, rows_extra=24, cta_y=1478, url_y=1538, shift=90)
+else:
+    P = dict(i_logo_w=440, i_logo_y=300, i_tag=820, i_title=930, i_title_s=150, i_sub=1045, wm_y=1240,
+             chip1_y=1090, chip_y=160, label_y=1085, o_logo_w=400, o_logo_y=250, o_title=505, o_title_s=112,
+             rows_y0=650, rows_dy=122, rows_extra=18, cta_y=1160, url_y=1215, shift=50)
+SHIFT = 0 if CTA else P["shift"]            # sans mention finale : on recentre le bloc
+OUTRO_D = 7.2 if CTA else 6.0
 PHOTOS = sys.argv[1]
 OUT = sys.argv[2]
 MODE = sys.argv[3] if len(sys.argv) > 3 else "full"      # full | stills
@@ -187,7 +199,7 @@ SHOTS = [  # nom du fichier, durée, mode, (z0,z1,fx0,fx1,fy0,fy1)
     ("13_salle-de-bain-2", 2.6, "fill", (1.10, 1.0, .6, .52, .5, .5)),
     ("14_piscine-privee", 3.0, "fill", (1.0, 1.12, .5, .5, .58, .52)),
     ("15_piscine-et-terrasse", 2.8, "fill", (1.12, 1.0, .55, .45, .5, .5)),
-    ("16_piscine-pierre-volcanique", 7.2, "outro", (1.0, 1.08, .5, .5, .5, .5)),
+    ("16_piscine-pierre-volcanique", OUTRO_D, "outro", (1.0, 1.08, .5, .5, .5, .5)),
 ]
 # transition à la fin de chaque plan i -> i+1 : (type, durée)
 TRANS = [("zoom", .55), ("push_left", .5), ("fade", .55), ("wipe", .55), ("push_up", .5), ("fade", .55),
@@ -328,53 +340,59 @@ def add_ev(shot, off, dur, layer, cx, cy, anim="rise", left=False):
 
 
 # Intro : médaillon de la marque + titre
-t = add_ev(0, .25, 3.2, logo_layer(520), 540, 520, "pop"); SX.append((t, sfx.pop(520), 1, 0))
-add_ev(0, .70, 2.7, tag("NOUVELLE VILLA"), 540, 1060)
-add_ev(0, .90, 2.5, text_layer("Lyla Villa", F_TITLE, 176, tracking=2, max_w=900, shadow=.75), 540, 1190)
-add_ev(0, 1.30, 2.1, text_layer("Grand-Baie  ·  Île Maurice", F_MED, 42, tracking=4, fill=WHITE, max_w=900, shadow=.9), 540, 1340)
+t = add_ev(0, .25, 3.2, logo_layer(P["i_logo_w"]), 540, P["i_logo_y"], "pop"); SX.append((t, sfx.pop(520), 1, 0))
+add_ev(0, .70, 2.7, tag("NOUVELLE VILLA"), 540, P["i_tag"])
+add_ev(0, .90, 2.5, text_layer("Lyla Villa", F_TITLE, P["i_title_s"], tracking=2, max_w=900, shadow=.75), 540, P["i_title"])
+add_ev(0, 1.30, 2.1, text_layer("Grand-Baie  ·  Île Maurice", F_MED, 42, tracking=4, fill=WHITE, max_w=900, shadow=.9), 540, P["i_sub"])
 SX.append((starts[0] + .05, sfx.shimmer(.75, .30), 1.0, 0))
 SX.append((starts[0] + .92, sfx.ding(1568, 1.8, .3), .8, 0))
 SX.append((starts[0] + 1.32, sfx.tick(1200), .9, 0))
-# Filigrane discret (logo) sur tous les plans intérieurs / extérieurs
-add_ev(1, .3, starts[15] - starts[1] - .1, logo_layer(170, glow=True), 824, 1775, "rise", left=True)
+# Logo en pied de page sur toutes les photos
+add_ev(1, .3, starts[15] - starts[1] - .1, logo_layer(170, glow=True), 824, P["wm_y"], "rise", left=True)
 
+LY, CY = P["label_y"], P["chip_y"]
 # Plan 2 : piscine privée
-t = add_ev(1, .45, 2.0, chip("pool", "PISCINE PRIVÉE"), 500, 1440, "pop"); SX.append((t, sfx.pop(640), 1, 0))
+t = add_ev(1, .45, 2.0, chip("pool", "PISCINE PRIVÉE"), 500, P["chip1_y"], "pop"); SX.append((t, sfx.pop(640), 1, 0))
 # Plans 3-7 : espaces de vie
 LAB = {2: ("Salon", None), 3: ("Salon & cuisine ouverte", None), 4: ("Ouvert sur la piscine", None),
        5: ("Salle à manger", None), 6: ("Cuisine entièrement équipée", None)}
 for i, (tx, sb) in LAB.items():
-    t = add_ev(i, .35, 2.0, label(tx, sb), 60, 1470, "rise", left=True); SX.append((t, sfx.tick(1500 + 90 * i), .8, -.2))
+    t = add_ev(i, .35, 2.0, label(tx, sb), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1500 + 90 * i), .8, -.2))
 # Chambres
-t = add_ev(7, .35, 2.2, chip("bed", "4 CHAMBRES"), 540, 440, "pop"); SX.append((t, sfx.pop(700), 1, 0))
+t = add_ev(7, .35, 2.2, chip("bed", "4 CHAMBRES"), 540, CY, "pop"); SX.append((t, sfx.pop(700), 1, 0))
 for n, i in enumerate((7, 8, 9, 10), 1):
     sub = "Vue piscine" if i == 8 else None
-    t = add_ev(i, .45 if i == 7 else .3, 2.0, label(f"Chambre {n}", sub), 60, 1470, "rise", left=True)
+    t = add_ev(i, .45 if i == 7 else .3, 2.0, label(f"Chambre {n}", sub), 60, LY, "rise", left=True)
     SX.append((t, sfx.tick(1400 + 110 * n), .8, -.2))
 # Salles de bain
-t = add_ev(11, .35, 2.2, chip("shower", "3 SALLES DE BAIN"), 540, 440, "pop"); SX.append((t, sfx.pop(760), 1, 0))
-t = add_ev(11, .55, 1.9, label("Salle de bain"), 60, 1470, "rise", left=True); SX.append((t, sfx.tick(1700), .8, -.2))
-t = add_ev(12, .30, 2.0, label("Salle de bain"), 60, 1470, "rise", left=True); SX.append((t, sfx.tick(1800), .8, -.2))
+t = add_ev(11, .35, 2.2, chip("shower", "3 SALLES DE BAIN"), 540, CY, "pop"); SX.append((t, sfx.pop(760), 1, 0))
+t = add_ev(11, .55, 1.9, label("Salle de bain"), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1700), .8, -.2))
+t = add_ev(12, .30, 2.0, label("Salle de bain"), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1800), .8, -.2))
 # Piscine
-t = add_ev(13, .35, 2.5, chip("pool", "PISCINE PRIVÉE", "Terrasse en bois"), 540, 440, "pop"); SX.append((t, sfx.pop(660), 1, 0))
+t = add_ev(13, .35, 2.5, chip("pool", "PISCINE PRIVÉE", "Terrasse en bois"), 540, CY, "pop"); SX.append((t, sfx.pop(660), 1, 0))
 SX.append((starts[13] + .1, sfx.water(2.2, .32), 1, 0))
-t = add_ev(14, .3, 2.2, label("Détente au bord de l'eau"), 60, 1470, "rise", left=True); SX.append((t, sfx.tick(1500), .8, -.2))
+t = add_ev(14, .3, 2.2, label("Détente au bord de l'eau"), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1500), .8, -.2))
 SX.append((starts[14] + .2, sfx.water(1.8, .22), 1, .1))
 
-# Outro : médaillon, critères, appel à réserver (reste affiché jusqu'à la fin)
+# Outro : médaillon, critères, (appel à réserver si CTA) — reste affiché jusqu'à la fin
 o = 15; HOLD = 30
-t = add_ev(o, .30, HOLD, logo_layer(540), 540, 480, "pop"); SX.append((t, sfx.pop(480), 1, 0))
-add_ev(o, .70, HOLD, text_layer("Lyla Villa", F_TITLE, 132, tracking=2, max_w=900, shadow=.75), 540, 790)
+t = add_ev(o, .30, HOLD, logo_layer(P["o_logo_w"]), 540, P["o_logo_y"] + SHIFT, "pop"); SX.append((t, sfx.pop(480), 1, 0))
+add_ev(o, .70, HOLD, text_layer("Lyla Villa", F_TITLE, P["o_title_s"], tracking=2, max_w=900, shadow=.75), 540, P["o_title"] + SHIFT)
 rows = [("bed", "4 CHAMBRES", None), ("shower", "3 SALLES DE BAIN", None), ("pool", "PISCINE PRIVÉE", None),
         ("pin", "GRAND-BAIE", "à quelques minutes de la plage et du centre-ville")]
 for k, (ic, tx, sb) in enumerate(rows):
     off = 1.2 + .5 * k
-    t = add_ev(o, off, HOLD, chip(ic, tx, sb, min_w=900), 540, 935 + 138 * k + (24 if k == 3 else 0), "pop")
+    t = add_ev(o, off, HOLD, chip(ic, tx, sb, min_w=900), 540,
+               P["rows_y0"] + SHIFT + P["rows_dy"] * k + (P["rows_extra"] if k == 3 else 0), "pop")
     SX.append((t, sfx.pop(560 + 70 * k, .3, .42), 1, 0))
-add_ev(o, 3.7, HOLD, text_layer("Réservation directe au meilleur tarif", F_SEMI, 40, tracking=1, max_w=940, shadow=.8), 540, 1478)
-add_ev(o, 4.0, HOLD, text_layer("maurenthouses.myweb.smoobu.com", F_MED, 34, tracking=1, fill=PEACH, max_w=940, shadow=.8), 540, 1538)
-SX.append((starts[o] + 3.72, sfx.ding(1760, 2.0, .34), .9, 0))
-SX.append((starts[o] + 3.8, sfx.shimmer(.8, .2), .6, 0))
+if CTA:
+    add_ev(o, 3.7, HOLD, text_layer("Réservation directe au meilleur tarif", F_SEMI, 40, tracking=1, max_w=940, shadow=.8), 540, P["cta_y"])
+    add_ev(o, 4.0, HOLD, text_layer("maurenthouses.myweb.smoobu.com", F_MED, 34, tracking=1, fill=PEACH, max_w=940, shadow=.8), 540, P["url_y"])
+    SX.append((starts[o] + 3.72, sfx.ding(1760, 2.0, .34), .9, 0))
+    SX.append((starts[o] + 3.8, sfx.shimmer(.8, .2), .6, 0))
+else:
+    SX.append((starts[o] + 2.95, sfx.ding(1760, 2.0, .34), .9, 0))
+    SX.append((starts[o] + 3.0, sfx.shimmer(.8, .2), .6, 0))
 
 # Transitions -> sons
 for i, (kind, d) in enumerate(TRANS):
