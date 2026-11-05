@@ -7,6 +7,7 @@ import sfx
 
 FMT = os.environ.get("FMT", "9x16")          # 9x16 (Reels/Stories/TikTok) | 4x5 (Facebook fil d'actualité)
 CTA = os.environ.get("CTA", "1") == "1"
+VILLA = os.environ.get("VILLA", "lyla")      # lyla | palmarin
 NEW_TAG = os.environ.get("NEW_TAG", "1") == "1"   # pastille « NOUVELLE VILLA » dans l'intro (0 = version réutilisable)      # mention "Réservation directe..." + lien sur le dernier plan
 W, H, FPS = (1080, 1350, 30) if FMT == "4x5" else (1080, 1920, 30)
 if H == 1920:
@@ -184,7 +185,7 @@ def label(text, sub=None):
 
 
 # ------------------------------------------------------------------ plan de montage
-SHOTS = [  # nom du fichier, durée, mode, (z0,z1,fx0,fx1,fy0,fy1)
+SHOTS_LYLA = [  # nom du fichier, durée, mode, (z0,z1,fx0,fx1,fy0,fy1)
     ("01_facade", 3.9, "fill", (1.00, 1.10, .5, .5, .54, .46)),
     ("02_facade-piscine-vue-large", 2.7, "fit", (1.0, 1.07, .5, .5, .5, .5)),
     ("03_salon", 2.7, "fill", (1.12, 1.0, .56, .44, .5, .5)),
@@ -202,6 +203,36 @@ SHOTS = [  # nom du fichier, durée, mode, (z0,z1,fx0,fx1,fy0,fy1)
     ("15_piscine-et-terrasse", 2.8, "fill", (1.12, 1.0, .55, .45, .5, .5)),
     ("16_piscine-pierre-volcanique", OUTRO_D, "outro", (1.0, 1.08, .5, .5, .5, .5)),
 ]
+SHOTS_PAL = [
+    ("01_facade-couverture", 3.9, "fill", (1.00, 1.10, .5, .5, .56, .48)),
+    ("02_facade-palmier", 2.7, "fill", (1.10, 1.0, .45, .55, .5, .5)),
+    ("03_salon", 2.7, "fill", (1.12, 1.0, .56, .44, .5, .5)),
+    ("04_salon-tv", 2.7, "fill", (1.0, 1.10, .45, .56, .5, .5)),
+    ("05_sejour-terrasse", 2.7, "fill", (1.10, 1.0, .62, .5, .5, .5)),
+    ("06_salle-a-manger-cuisine", 2.7, "fill", (1.0, 1.10, .5, .4, .5, .5)),
+    ("07_cuisine-equipee", 2.7, "fill", (1.10, 1.0, .4, .6, .5, .5)),
+    ("08_chambre-1", 2.8, "fill", (1.0, 1.12, .5, .5, .5, .5)),
+    ("09_chambre-2-vue-piscine", 2.6, "fill", (1.08, 1.0, .36, .56, .5, .5)),
+    ("10_chambre-3", 2.6, "fill", (1.0, 1.10, .5, .4, .5, .5)),
+    ("11_chambre-4", 2.6, "fill", (1.10, 1.0, .45, .55, .5, .5)),
+    ("12_salle-de-bain-1", 2.7, "fill", (1.0, 1.10, .52, .58, .5, .5)),
+    ("13_salle-de-bain-2", 2.6, "fill", (1.10, 1.0, .6, .52, .5, .5)),
+    ("14_piscine-jardin", 3.0, "fill", (1.0, 1.12, .5, .5, .58, .52)),
+    ("15_terrasse-piscine", 2.8, "fill", (1.12, 1.0, .55, .45, .5, .5)),
+    ("16_facade-fin", OUTRO_D, "outro", (1.0, 1.08, .5, .5, .5, .5)),
+]
+SHOTS = SHOTS_PAL if VILLA == "palmarin" else SHOTS_LYLA
+if VILLA == "palmarin":
+    TITLE, LOC_SUB = "Villa Palmarin", "à quelques minutes de toutes commodités"
+    LAB = {2: ("Salon", None), 3: ("Salon & télévision", None), 4: ("Séjour ouvert sur la terrasse", None),
+           5: ("Salle à manger & cuisine", None), 6: ("Cuisine entièrement équipée", None)}
+    POOL_SUB, LAST_LABEL = "Jardin & terrasse", "Terrasse en bois & piscine"
+else:
+    TITLE, LOC_SUB = "Lyla Villa", "à quelques minutes de la plage et du centre-ville"
+    LAB = {2: ("Salon", None), 3: ("Salon & cuisine ouverte", None), 4: ("Ouvert sur la piscine", None),
+           5: ("Salle à manger", None), 6: ("Cuisine entièrement équipée", None)}
+    POOL_SUB, LAST_LABEL = "Terrasse en bois", "Détente au bord de l'eau"
+
 # transition à la fin de chaque plan i -> i+1 : (type, durée)
 TRANS = [("zoom", .55), ("push_left", .5), ("fade", .55), ("wipe", .55), ("push_up", .5), ("fade", .55),
          ("flash", .5), ("push_left", .5), ("wipe", .5), ("push_left", .5), ("flash", .5), ("fade", .5),
@@ -344,7 +375,7 @@ def add_ev(shot, off, dur, layer, cx, cy, anim="rise", left=False):
 t = add_ev(0, .25, 3.2, logo_layer(P["i_logo_w"]), 540, P["i_logo_y"], "pop"); SX.append((t, sfx.pop(520), 1, 0))
 if NEW_TAG:
     add_ev(0, .70, 2.7, tag("NOUVELLE VILLA"), 540, P["i_tag"])
-add_ev(0, .90, 2.5, text_layer("Lyla Villa", F_TITLE, P["i_title_s"], tracking=2, max_w=900, shadow=.75), 540, P["i_title"])
+add_ev(0, .90, 2.5, text_layer(TITLE, F_TITLE, P["i_title_s"], tracking=2, max_w=900, shadow=.75), 540, P["i_title"])
 add_ev(0, 1.30, 2.1, text_layer("Grand-Baie  ·  Île Maurice", F_MED, 42, tracking=4, fill=WHITE, max_w=900, shadow=.9), 540, P["i_sub"])
 SX.append((starts[0] + .05, sfx.shimmer(.75, .30), 1.0, 0))
 SX.append((starts[0] + .92, sfx.ding(1568, 1.8, .3), .8, 0))
@@ -354,10 +385,8 @@ add_ev(1, .3, starts[15] - starts[1] - .1, logo_layer(170, glow=True), 824, P["w
 
 LY, CY = P["label_y"], P["chip_y"]
 # Plan 2 : piscine privée
-t = add_ev(1, .45, 2.0, chip("pool", "PISCINE PRIVÉE"), 500, P["chip1_y"], "pop"); SX.append((t, sfx.pop(640), 1, 0))
+t = add_ev(1, .45, 2.0, chip("pool", "PISCINE PRIVÉE"), *((500, P["chip1_y"]) if SHOTS[1][2] == "fit" else (540, CY)), "pop"); SX.append((t, sfx.pop(640), 1, 0))
 # Plans 3-7 : espaces de vie
-LAB = {2: ("Salon", None), 3: ("Salon & cuisine ouverte", None), 4: ("Ouvert sur la piscine", None),
-       5: ("Salle à manger", None), 6: ("Cuisine entièrement équipée", None)}
 for i, (tx, sb) in LAB.items():
     t = add_ev(i, .35, 2.0, label(tx, sb), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1500 + 90 * i), .8, -.2))
 # Chambres
@@ -371,17 +400,17 @@ t = add_ev(11, .35, 2.2, chip("shower", "3 SALLES DE BAIN"), 540, CY, "pop"); SX
 t = add_ev(11, .55, 1.9, label("Salle de bain"), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1700), .8, -.2))
 t = add_ev(12, .30, 2.0, label("Salle de bain"), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1800), .8, -.2))
 # Piscine
-t = add_ev(13, .35, 2.5, chip("pool", "PISCINE PRIVÉE", "Terrasse en bois"), 540, CY, "pop"); SX.append((t, sfx.pop(660), 1, 0))
+t = add_ev(13, .35, 2.5, chip("pool", "PISCINE PRIVÉE", POOL_SUB), 540, CY, "pop"); SX.append((t, sfx.pop(660), 1, 0))
 SX.append((starts[13] + .1, sfx.water(2.2, .32), 1, 0))
-t = add_ev(14, .3, 2.2, label("Détente au bord de l'eau"), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1500), .8, -.2))
+t = add_ev(14, .3, 2.2, label(LAST_LABEL), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1500), .8, -.2))
 SX.append((starts[14] + .2, sfx.water(1.8, .22), 1, .1))
 
 # Outro : médaillon, critères, (appel à réserver si CTA) — reste affiché jusqu'à la fin
 o = 15; HOLD = 30
 t = add_ev(o, .30, HOLD, logo_layer(P["o_logo_w"]), 540, P["o_logo_y"] + SHIFT, "pop"); SX.append((t, sfx.pop(480), 1, 0))
-add_ev(o, .70, HOLD, text_layer("Lyla Villa", F_TITLE, P["o_title_s"], tracking=2, max_w=900, shadow=.75), 540, P["o_title"] + SHIFT)
+add_ev(o, .70, HOLD, text_layer(TITLE, F_TITLE, P["o_title_s"], tracking=2, max_w=900, shadow=.75), 540, P["o_title"] + SHIFT)
 rows = [("bed", "4 CHAMBRES", None), ("shower", "3 SALLES DE BAIN", None), ("pool", "PISCINE PRIVÉE", None),
-        ("pin", "GRAND-BAIE", "à quelques minutes de la plage et du centre-ville")]
+        ("pin", "GRAND-BAIE", LOC_SUB)]
 for k, (ic, tx, sb) in enumerate(rows):
     off = 1.2 + .5 * k
     t = add_ev(o, off, HOLD, chip(ic, tx, sb, min_w=900), 540,
