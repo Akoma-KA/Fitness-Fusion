@@ -217,9 +217,10 @@ SHOTS_PAL = [
     ("11_chambre-4", 2.6, "fill", (1.10, 1.0, .45, .55, .5, .5)),
     ("12_salle-de-bain-1", 2.7, "fill", (1.0, 1.10, .52, .58, .5, .5)),
     ("13_salle-de-bain-2", 2.6, "fill", (1.10, 1.0, .6, .52, .5, .5)),
-    ("14_piscine-jardin", 3.0, "fill", (1.0, 1.12, .5, .5, .58, .52)),
-    ("15_terrasse-piscine", 2.8, "fill", (1.12, 1.0, .55, .45, .5, .5)),
-    ("16_facade-fin", OUTRO_D, "outro", (1.0, 1.08, .5, .5, .5, .5)),
+    ("14_salle-de-bain-3", 2.6, "fill", (1.0, 1.10, .45, .55, .5, .5)),
+    ("15_piscine-jardin", 3.0, "fill", (1.0, 1.12, .5, .5, .58, .52)),
+    ("16_terrasse-piscine", 2.8, "fill", (1.12, 1.0, .55, .45, .5, .5)),
+    ("17_facade-fin", OUTRO_D, "outro", (1.0, 1.08, .5, .5, .5, .5)),
 ]
 SHOTS = SHOTS_PAL if VILLA == "palmarin" else SHOTS_LYLA
 if VILLA == "palmarin":
@@ -237,6 +238,8 @@ else:
 TRANS = [("zoom", .55), ("push_left", .5), ("fade", .55), ("wipe", .55), ("push_up", .5), ("fade", .55),
          ("flash", .5), ("push_left", .5), ("wipe", .5), ("push_left", .5), ("flash", .5), ("fade", .5),
          ("flash", .5), ("zoom", .55), ("fade", .9)]
+if VILLA == "palmarin":
+    TRANS = TRANS[:12] + [("fade", .5)] + TRANS[12:]
 starts, t = [], 0.0
 for i, s in enumerate(SHOTS):
     starts.append(t)
@@ -381,7 +384,7 @@ SX.append((starts[0] + .05, sfx.shimmer(.75, .30), 1.0, 0))
 SX.append((starts[0] + .92, sfx.ding(1568, 1.8, .3), .8, 0))
 SX.append((starts[0] + 1.32, sfx.tick(1200), .9, 0))
 # Logo en pied de page sur toutes les photos
-add_ev(1, .3, starts[15] - starts[1] - .1, logo_layer(170, glow=True), 824, P["wm_y"], "rise", left=True)
+add_ev(1, .3, starts[len(SHOTS) - 1] - starts[1] - .1, logo_layer(170, glow=True), 824, P["wm_y"], "rise", left=True)
 
 LY, CY = P["label_y"], P["chip_y"]
 # Plan 2 : piscine privée
@@ -399,14 +402,18 @@ for n, i in enumerate((7, 8, 9, 10), 1):
 t = add_ev(11, .35, 2.2, chip("shower", "3 SALLES DE BAIN"), 540, CY, "pop"); SX.append((t, sfx.pop(760), 1, 0))
 t = add_ev(11, .55, 1.9, label("Salle de bain"), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1700), .8, -.2))
 t = add_ev(12, .30, 2.0, label("Salle de bain"), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1800), .8, -.2))
+PX = 0
+if VILLA == "palmarin":        # 3e salle de bain
+    PX = 1
+    t = add_ev(13, .30, 2.0, label("Salle de bain"), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1900), .8, -.2))
 # Piscine
-t = add_ev(13, .35, 2.5, chip("pool", "PISCINE PRIVÉE", POOL_SUB), 540, CY, "pop"); SX.append((t, sfx.pop(660), 1, 0))
-SX.append((starts[13] + .1, sfx.water(2.2, .32), 1, 0))
-t = add_ev(14, .3, 2.2, label(LAST_LABEL), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1500), .8, -.2))
-SX.append((starts[14] + .2, sfx.water(1.8, .22), 1, .1))
+t = add_ev(13 + PX, .35, 2.5, chip("pool", "PISCINE PRIVÉE", POOL_SUB), 540, CY, "pop"); SX.append((t, sfx.pop(660), 1, 0))
+SX.append((starts[13 + PX] + .1, sfx.water(2.2, .32), 1, 0))
+t = add_ev(14 + PX, .3, 2.2, label(LAST_LABEL), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1500), .8, -.2))
+SX.append((starts[14 + PX] + .2, sfx.water(1.8, .22), 1, .1))
 
 # Outro : médaillon, critères, (appel à réserver si CTA) — reste affiché jusqu'à la fin
-o = 15; HOLD = 30
+o = len(SHOTS) - 1; HOLD = 30
 t = add_ev(o, .30, HOLD, logo_layer(P["o_logo_w"]), 540, P["o_logo_y"] + SHIFT, "pop"); SX.append((t, sfx.pop(480), 1, 0))
 add_ev(o, .70, HOLD, text_layer(TITLE, F_TITLE, P["o_title_s"], tracking=2, max_w=900, shadow=.75), 540, P["o_title"] + SHIFT)
 rows = [("bed", "4 CHAMBRES", None), ("shower", "3 SALLES DE BAIN", None), ("pool", "PISCINE PRIVÉE", None),
