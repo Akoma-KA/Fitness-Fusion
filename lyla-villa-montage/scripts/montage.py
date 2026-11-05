@@ -222,15 +222,13 @@ def kb_window(iw, ih, p, cfg, aspect):
     return (x0, y0, x0 + w, y0 + h)
 
 
+SHARP = ImageFilter.UnsharpMask(radius=1.3, percent=65, threshold=2)
 _bg_cache = {}
 def fit_bg(name):
     if name not in _bg_cache:
-        im = imgs[name]
-        box = kb_window(*im.size, 0, (1, 1, .5, .5, .5, .5), W / H)
-        bg = im.resize((W, H), Image.BICUBIC, box=box).filter(ImageFilter.GaussianBlur(34))
-        a = np.asarray(bg, dtype=np.float32) * .78
-        a = a * .9 + a.mean(-1, keepdims=True) * .1
-        _bg_cache[name] = a.astype(np.uint8)
+        g = np.linspace(0, 1, H, dtype=np.float32)[:, None, None]
+        a = np.array(NAVY_D, np.float32) * (1 - g) + np.array(NAVY, np.float32) * g
+        _bg_cache[name] = np.broadcast_to(a, (H, W, 3)).astype(np.uint8).copy()
     return _bg_cache[name]
 
 
@@ -251,16 +249,12 @@ def render_shot(i, lt):
     if mode == "fit":
         base = fit_bg(name).copy()
         box = kb_window(*im.size, p, cfg, 4 / 3)
-        fg = im.resize((W, 810), Image.LANCZOS, box=box)
+        fg = im.resize((W, 810), Image.LANCZOS, box=box).filter(SHARP)
         y0 = (H - 810) // 2 - 70
-        m = np.ones((810, 1), np.float32)
-        f = 90
-        m[:f] = np.linspace(0, 1, f)[:, None]; m[-f:] = np.linspace(1, 0, f)[:, None]
-        reg = base[y0:y0 + 810].astype(np.float32)
-        base[y0:y0 + 810] = (reg * (1 - m[..., None]) + np.asarray(fg, np.float32) * m[..., None]).astype(np.uint8)
+        base[y0:y0 + 810] = np.asarray(fg)
         return base
     box = kb_window(*im.size, p, cfg, W / H)
-    fr = np.asarray(im.resize((W, H), Image.LANCZOS, box=box))
+    fr = np.asarray(im.resize((W, H), Image.LANCZOS, box=box).filter(SHARP))
     if mode == "outro":
         a, col = outro_tint()
         fr = (fr.astype(np.float32) * (1 - a) + col * a).astype(np.uint8)
@@ -342,10 +336,10 @@ SX.append((starts[0] + .05, sfx.shimmer(.75, .30), 1.0, 0))
 SX.append((starts[0] + .92, sfx.ding(1568, 1.8, .3), .8, 0))
 SX.append((starts[0] + 1.32, sfx.tick(1200), .9, 0))
 # Filigrane discret (logo) sur tous les plans intérieurs / extérieurs
-add_ev(1, .3, starts[15] - starts[1] - .1, logo_layer(150, glow=True), 8, 330, "rise", left=True)
+add_ev(1, .3, starts[15] - starts[1] - .1, logo_layer(170, glow=True), 824, 1495, "rise", left=True)
 
 # Plan 2 : piscine privée
-t = add_ev(1, .45, 2.0, chip("pool", "PISCINE PRIVÉE"), 540, 1500, "pop"); SX.append((t, sfx.pop(640), 1, 0))
+t = add_ev(1, .45, 2.0, chip("pool", "PISCINE PRIVÉE"), 500, 1440, "pop"); SX.append((t, sfx.pop(640), 1, 0))
 # Plans 3-7 : espaces de vie
 LAB = {2: ("Salon", None), 3: ("Salon & cuisine ouverte", None), 4: ("Ouvert sur la piscine", None),
        5: ("Salle à manger", None), 6: ("Cuisine entièrement équipée", None)}
@@ -456,7 +450,6 @@ def frame_at(t):
     fr = fr.astype(np.float32)
     # poussière lumineuse (bokeh) qui dérive vers le haut
     off = int((t * 16) % 700)
-    fr += BOKEH[off:off + H, :, None] * WARM * .9
     # reflet lumineux pendant les transitions
     if sweep > 0:
         pos = -.25 + 1.5 * (tp if tp is not None else 0)
@@ -466,7 +459,7 @@ def frame_at(t):
     k = .34 + .30 * clamp((3.9 - t) / .9)
     if i >= len(SHOTS) - 1:
         k = 0.0
-    fr *= (1 - k * GRAD)[:, None, None] * (1 - .22 * GRAD_TOP)[:, None, None] * VIG
+    fr *= (1 - k * GRAD)[:, None, None]
     np.clip(fr, 0, 255, out=fr)
     draw_events(fr, t)
     return fr.astype(np.uint8)
