@@ -9,10 +9,13 @@ W, H, FPS = 1080, 1920, 30
 PHOTOS = sys.argv[1]
 OUT = sys.argv[2]
 MODE = sys.argv[3] if len(sys.argv) > 3 else "full"      # full | stills
-FD = "/usr/share/fonts/opentype/inter/"
-F_LIGHT, F_MED, F_SEMI = FD + "InterDisplay-Light.otf", FD + "InterDisplay-Medium.otf", FD + "InterDisplay-SemiBold.otf"
-SAND = (233, 201, 143)
-TEAL = (14, 52, 58)
+BRAND = os.environ.get("BRAND_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "brand")) + "/"
+F_TITLE = BRAND + "AbrilFatface-400.ttf"                      # titres  (police du site Mau-rent Houses)
+F_LIGHT, F_MED, F_SEMI = BRAND + "Epilogue-400.ttf", BRAND + "Epilogue-500.ttf", BRAND + "Epilogue-600.ttf"
+NAVY, NAVY_D = (18, 34, 103), (9, 18, 60)                     # bleu marine du logo / du site
+CORAL, PEACH = (255, 95, 109), (255, 195, 113)                # dégradé du logo
+SAND = PEACH                                                  # accent texte
+TEAL = NAVY                                                   # traits des icônes
 WHITE = (255, 255, 255)
 
 # ------------------------------------------------------------------ utilitaires
@@ -57,6 +60,36 @@ def rounded_shadow(w, h, r, fill, border=None, blur=18, off=8, sh_a=90):
     return Image.alpha_composite(sh, lay), pad
 
 
+def grad_disc(d):
+    S = 4; n = d * S
+    g = np.linspace(0, 1, n, dtype=np.float32)[None, :, None]
+    arr = (np.array(CORAL, np.float32) * (1 - g) + np.array(PEACH, np.float32) * g)
+    arr = np.broadcast_to(arr, (n, n, 3)).astype(np.uint8)
+    m = Image.new("L", (n, n), 0); ImageDraw.Draw(m).ellipse((0, 0, n - 1, n - 1), fill=255)
+    im = Image.fromarray(arr).convert("RGBA"); im.putalpha(m)
+    return im.resize((d, d), Image.LANCZOS)
+
+
+def grad_bar(w, h):
+    g = np.linspace(0, 1, h, dtype=np.float32)[:, None, None]
+    arr = np.broadcast_to(np.array(CORAL, np.float32) * (1 - g) + np.array(PEACH, np.float32) * g, (h, w, 3)).astype(np.uint8)
+    return Image.fromarray(arr).convert("RGBA")
+
+
+_LOGO = Image.open(BRAND + "maurent-logo-badge.png").convert("RGBA")
+def logo_layer(width, glow=True):
+    h = int(_LOGO.height * width / _LOGO.width)
+    lg = _LOGO.resize((width, h), Image.LANCZOS)
+    pad = 50
+    lay = Image.new("RGBA", (width + pad * 2, h + pad * 2), (0, 0, 0, 0))
+    if glow:
+        sh = Image.new("RGBA", lay.size, (0, 0, 0, 0))
+        sh.paste((0, 0, 0, 120), (pad, pad + 8), lg.split()[3])
+        lay = Image.alpha_composite(lay, sh.filter(ImageFilter.GaussianBlur(14)))
+    lay.alpha_composite(lg, (pad, pad))
+    return lay
+
+
 # ---- icônes dessinées en vectoriel (suréchantillonnées)
 def icon(kind, size=64):
     S = 512; k = S / 128
@@ -84,7 +117,7 @@ def icon(kind, size=64):
     elif kind == "pin":
         d.ellipse(P(38, 22, 90, 74), fill=c)
         d.polygon(P(42, 62, 86, 62, 64, 108), fill=c)
-        d.ellipse(P(55, 39, 73, 57), fill=SAND + (255,))
+        d.ellipse(P(55, 39, 73, 57), fill=(255, 140, 110, 255))
     return im.resize((size, size), Image.LANCZOS)
 
 
@@ -94,10 +127,10 @@ def chip(kind, text, sub=None, min_w=0):
     sw_ = (sum(fs.getlength(c) for c in sub) + 1.5 * (len(sub) - 1)) if sub else 0
     h = 124 if sub else 100
     w = int(max(min_w, 40 + 70 + 22 + max(tw, sw_) + 44))
-    base, pad = rounded_shadow(w, h, h // 2, (10, 36, 42, 200), border=(255, 255, 255, 70))
+    base, pad = rounded_shadow(w, h, h // 2, NAVY + (228,), border=PEACH + (110,))
     d = ImageDraw.Draw(base)
     cx, cy = pad + 40 + 35, pad + h // 2
-    d.ellipse((cx - 35, cy - 35, cx + 35, cy + 35), fill=SAND + (255,))
+    base.alpha_composite(grad_disc(70), (cx - 35, cy - 35))
     base.alpha_composite(icon(kind, 46), (cx - 23, cy - 23))
     x = pad + 40 + 70 + 22
     y = pad + (h - 40) // 2 - (14 if sub else 0) - 4
@@ -114,7 +147,7 @@ def tag(text):
     f = ImageFont.truetype(F_SEMI, 32)
     tw = sum(f.getlength(c) for c in text) + 5 * (len(text) - 1)
     w, h = int(tw + 80), 76
-    base, pad = rounded_shadow(w, h, h // 2, (10, 36, 42, 205), border=(255, 255, 255, 70))
+    base, pad = rounded_shadow(w, h, h // 2, NAVY + (232,), border=PEACH + (110,))
     d = ImageDraw.Draw(base); x = pad + 40
     for c in text:
         d.text((x, pad + 17), c, font=f, fill=SAND + (255,)); x += f.getlength(c) + 5
@@ -132,7 +165,7 @@ def label(text, sub=None):
     y = 0
     for p in parts:
         lay.alpha_composite(p, (30, y)); y -= 0; y += p.height - 60
-    bar = Image.new("RGBA", (8, 70), SAND + (255,))
+    bar = grad_bar(8, 70)
     lay.alpha_composite(bar, (14, 44))
     return lay
 
@@ -154,7 +187,7 @@ SHOTS = [  # nom du fichier, durée, mode, (z0,z1,fx0,fx1,fy0,fy1)
     ("13_salle-de-bain-2", 2.6, "fill", (1.10, 1.0, .6, .52, .5, .5)),
     ("14_piscine-privee", 3.0, "fill", (1.0, 1.12, .5, .5, .58, .52)),
     ("15_piscine-et-terrasse", 2.8, "fill", (1.12, 1.0, .55, .45, .5, .5)),
-    ("16_piscine-pierre-volcanique", 6.4, "outro", (1.0, 1.08, .5, .5, .5, .5)),
+    ("16_piscine-pierre-volcanique", 7.2, "outro", (1.0, 1.08, .5, .5, .5, .5)),
 ]
 # transition à la fin de chaque plan i -> i+1 : (type, durée)
 TRANS = [("zoom", .55), ("push_left", .5), ("fade", .55), ("wipe", .55), ("push_up", .5), ("fade", .55),
@@ -206,8 +239,8 @@ def outro_tint():
     global _tint
     if _tint is None:
         y = np.linspace(0, 1, H, dtype=np.float32)[:, None]
-        a = 0.58 + 0.18 * y  # voile teal plus dense en bas
-        _tint = (np.broadcast_to(a[..., None], (H, W, 1)).copy(), np.array([8, 44, 50], np.float32))
+        a = 0.64 + 0.22 * y  # voile teal plus dense en bas
+        _tint = (np.broadcast_to(a[..., None], (H, W, 1)).copy(), np.array(NAVY_D, np.float32))
     return _tint
 
 
@@ -286,7 +319,7 @@ for _ in range(46):
     d = np.sqrt((gx - cx) ** 2 + (gy - cy) ** 2) / r
     bk[y0:y1, x0:x1] += _rs.uniform(.05, .12) * np.clip(1.15 - d, 0, 1) ** .8 * (1 + .6 * (np.abs(d - .85) < .12))
 BOKEH = np.minimum(bk, .22)
-WARM = np.array([255, 236, 205], np.float32)
+WARM = np.array([255, 214, 172], np.float32)
 
 
 # ------------------------------------------------------------------ évènements texte
@@ -300,13 +333,16 @@ def add_ev(shot, off, dur, layer, cx, cy, anim="rise", left=False):
     return t_in
 
 
-# Intro
-add_ev(0, .30, 3.0, tag("NOUVEAU  ·  MAU-RENT HOUSES"), 540, 340)
-add_ev(0, .60, 2.75, text_layer("LYLA VILLA", F_LIGHT, 160, tracking=14, max_w=860, shadow=.8), 540, 1190)
-add_ev(0, 1.05, 2.3, text_layer("Grand-Baie  ·  Île Maurice", F_MED, 40, tracking=4, max_w=900, shadow=.7), 540, 1335)
+# Intro : médaillon de la marque + titre
+t = add_ev(0, .25, 3.2, logo_layer(520), 540, 520, "pop"); SX.append((t, sfx.pop(520), 1, 0))
+add_ev(0, .70, 2.7, tag("NOUVELLE VILLA"), 540, 1060)
+add_ev(0, .90, 2.5, text_layer("Lyla Villa", F_TITLE, 176, tracking=2, max_w=900, shadow=.75), 540, 1190)
+add_ev(0, 1.30, 2.1, text_layer("Grand-Baie  ·  Île Maurice", F_MED, 42, tracking=4, fill=WHITE, max_w=900, shadow=.9), 540, 1340)
 SX.append((starts[0] + .05, sfx.shimmer(.75, .30), 1.0, 0))
-SX.append((starts[0] + .62, sfx.ding(1568, 1.8, .3), .8, 0))
-SX.append((starts[0] + 1.07, sfx.tick(1200), .9, 0))
+SX.append((starts[0] + .92, sfx.ding(1568, 1.8, .3), .8, 0))
+SX.append((starts[0] + 1.32, sfx.tick(1200), .9, 0))
+# Filigrane discret (logo) sur tous les plans intérieurs / extérieurs
+add_ev(1, .3, starts[15] - starts[1] - .1, logo_layer(150, glow=True), 8, 330, "rise", left=True)
 
 # Plan 2 : piscine privée
 t = add_ev(1, .45, 2.0, chip("pool", "PISCINE PRIVÉE"), 540, 1500, "pop"); SX.append((t, sfx.pop(640), 1, 0))
@@ -331,19 +367,20 @@ SX.append((starts[13] + .1, sfx.water(2.2, .32), 1, 0))
 t = add_ev(14, .3, 2.2, label("Détente au bord de l'eau"), 60, 1470, "rise", left=True); SX.append((t, sfx.tick(1500), .8, -.2))
 SX.append((starts[14] + .2, sfx.water(1.8, .22), 1, .1))
 
-# Outro (récapitulatif des critères)
-o = 15
-add_ev(o, .35, 6.0, text_layer("LYLA VILLA", F_LIGHT, 130, tracking=14, max_w=940, shadow=.7), 540, 430)
-add_ev(o, .55, 5.8, text_layer("by Mau-rent Houses", F_MED, 36, tracking=5, fill=SAND, max_w=800), 540, 560)
+# Outro : médaillon, critères, appel à réserver (reste affiché jusqu'à la fin)
+o = 15; HOLD = 30
+t = add_ev(o, .30, HOLD, logo_layer(540), 540, 480, "pop"); SX.append((t, sfx.pop(480), 1, 0))
+add_ev(o, .70, HOLD, text_layer("Lyla Villa", F_TITLE, 132, tracking=2, max_w=900, shadow=.75), 540, 790)
 rows = [("bed", "4 CHAMBRES", None), ("shower", "3 SALLES DE BAIN", None), ("pool", "PISCINE PRIVÉE", None),
         ("pin", "GRAND-BAIE", "à quelques minutes de la plage et du centre-ville")]
 for k, (ic, tx, sb) in enumerate(rows):
-    off = 1.0 + .5 * k
-    t = add_ev(o, off, 6.0 - off, chip(ic, tx, sb, min_w=900), 540, 740 + 190 * k + (22 if k == 3 else 0), "pop")
+    off = 1.2 + .5 * k
+    t = add_ev(o, off, HOLD, chip(ic, tx, sb, min_w=900), 540, 935 + 138 * k + (24 if k == 3 else 0), "pop")
     SX.append((t, sfx.pop(560 + 70 * k, .3, .42), 1, 0))
-add_ev(o, 3.4, 2.7, text_layer("Réservez votre séjour", F_SEMI, 52, tracking=2, max_w=900, shadow=.7), 540, 1450)
-SX.append((starts[o] + 3.42, sfx.ding(1760, 2.0, .34), .9, 0))
-SX.append((starts[o] + 3.5, sfx.shimmer(.8, .2), .6, 0))
+add_ev(o, 3.7, HOLD, text_layer("Réservation directe au meilleur tarif", F_SEMI, 40, tracking=1, max_w=940, shadow=.8), 540, 1478)
+add_ev(o, 4.0, HOLD, text_layer("maurenthouses.myweb.smoobu.com", F_MED, 34, tracking=1, fill=PEACH, max_w=940, shadow=.8), 540, 1538)
+SX.append((starts[o] + 3.72, sfx.ding(1760, 2.0, .34), .9, 0))
+SX.append((starts[o] + 3.8, sfx.shimmer(.8, .2), .6, 0))
 
 # Transitions -> sons
 for i, (kind, d) in enumerate(TRANS):
@@ -426,7 +463,7 @@ def frame_at(t):
         band = np.exp(-((DIAG - pos) / .12) ** 2)[..., None]
         fr += band * WARM * .30 * sweep
     # voiles de lisibilité + vignette
-    k = .34 + .22 * clamp((3.9 - t) / .9)
+    k = .34 + .30 * clamp((3.9 - t) / .9)
     if i >= len(SHOTS) - 1:
         k = 0.0
     fr *= (1 - k * GRAD)[:, None, None] * (1 - .22 * GRAD_TOP)[:, None, None] * VIG
