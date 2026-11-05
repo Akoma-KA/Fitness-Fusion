@@ -6,7 +6,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 import sfx
 
 FMT = os.environ.get("FMT", "9x16")          # 9x16 (Reels/Stories/TikTok) | 4x5 (Facebook fil d'actualité)
-CTA = os.environ.get("CTA", "1") == "1"      # mention "Réservation directe..." + lien sur le dernier plan
+CTA = os.environ.get("CTA", "1") == "1"
+NEW_TAG = os.environ.get("NEW_TAG", "1") == "1"   # pastille « NOUVELLE VILLA » dans l'intro (0 = version réutilisable)      # mention "Réservation directe..." + lien sur le dernier plan
 W, H, FPS = (1080, 1350, 30) if FMT == "4x5" else (1080, 1920, 30)
 if H == 1920:
     P = dict(i_logo_w=520, i_logo_y=520, i_tag=1060, i_title=1190, i_title_s=176, i_sub=1340, wm_y=1775,
@@ -341,7 +342,8 @@ def add_ev(shot, off, dur, layer, cx, cy, anim="rise", left=False):
 
 # Intro : médaillon de la marque + titre
 t = add_ev(0, .25, 3.2, logo_layer(P["i_logo_w"]), 540, P["i_logo_y"], "pop"); SX.append((t, sfx.pop(520), 1, 0))
-add_ev(0, .70, 2.7, tag("NOUVELLE VILLA"), 540, P["i_tag"])
+if NEW_TAG:
+    add_ev(0, .70, 2.7, tag("NOUVELLE VILLA"), 540, P["i_tag"])
 add_ev(0, .90, 2.5, text_layer("Lyla Villa", F_TITLE, P["i_title_s"], tracking=2, max_w=900, shadow=.75), 540, P["i_title"])
 add_ev(0, 1.30, 2.1, text_layer("Grand-Baie  ·  Île Maurice", F_MED, 42, tracking=4, fill=WHITE, max_w=900, shadow=.9), 540, P["i_sub"])
 SX.append((starts[0] + .05, sfx.shimmer(.75, .30), 1.0, 0))
