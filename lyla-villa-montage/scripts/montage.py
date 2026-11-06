@@ -8,6 +8,8 @@ import sfx
 FMT = os.environ.get("FMT", "9x16")          # 9x16 (Reels/Stories/TikTok) | 4x5 (Facebook fil d'actualité)
 CTA = os.environ.get("CTA", "1") == "1"
 VILLA = os.environ.get("VILLA", "lyla")      # lyla | palmarin
+WITH_CLIPS = os.environ.get("CLIPS", "0") == "1"   # Lyla : insère les clips vidéo retouchés (prep_clips.py)
+CLIP_FRAMES = os.environ.get("CLIP_FRAMES", "clipframes")
 NEW_TAG = os.environ.get("NEW_TAG", "1") == "1"   # pastille « NOUVELLE VILLA » dans l'intro (0 = version réutilisable)      # mention "Réservation directe..." + lien sur le dernier plan
 W, H, FPS = (1080, 1350, 30) if FMT == "4x5" else (1080, 1920, 30)
 if H == 1920:
@@ -222,7 +224,14 @@ SHOTS_PAL = [
     ("16_terrasse-piscine", 2.8, "fill", (1.12, 1.0, .55, .45, .5, .5)),
     ("17_facade-fin", OUTRO_D, "outro", (1.0, 1.08, .5, .5, .5, .5)),
 ]
-SHOTS = SHOTS_PAL if VILLA == "palmarin" else SHOTS_LYLA
+SHOTS_LYLA_CLIPS = SHOTS_LYLA[:8] + [
+    ("clip-08a-chambre-1", 3.2, "clip", ()), ("clip-08b-chambre-1", 2.4, "clip", ()), ("clip-08c-chambre-1", 2.4, "clip", ()),
+    SHOTS_LYLA[8], ("clip-09-chambre-2", 2.8, "clip", ()),
+    SHOTS_LYLA[9], ("clip-10-chambre-3", 2.8, "clip", ()),
+    SHOTS_LYLA[10], ("clip-11-chambre-4", 2.8, "clip", ()),
+    SHOTS_LYLA[11], ("clip-12-salle-de-bain", 3.0, "clip", ()),
+] + SHOTS_LYLA[12:]
+SHOTS = SHOTS_PAL if VILLA == "palmarin" else (SHOTS_LYLA_CLIPS if WITH_CLIPS else SHOTS_LYLA)
 if VILLA == "palmarin":
     TITLE, LOC_SUB = "Villa Palmarin", "à quelques minutes de toutes commodités"
     LAB = {2: ("Salon", None), 3: ("Salon & télévision", None), 4: ("Séjour ouvert sur la terrasse", None),
@@ -238,6 +247,11 @@ else:
 TRANS = [("zoom", .55), ("push_left", .5), ("fade", .55), ("wipe", .55), ("push_up", .5), ("fade", .55),
          ("flash", .5), ("push_left", .5), ("wipe", .5), ("push_left", .5), ("flash", .5), ("fade", .5),
          ("flash", .5), ("zoom", .55), ("fade", .9)]
+if WITH_CLIPS and VILLA != "palmarin":
+    TRANS = [("zoom", .55), ("push_left", .5), ("fade", .55), ("wipe", .55), ("push_up", .5), ("fade", .55),
+             ("flash", .5), ("fade", .5), ("push_left", .5), ("fade", .5), ("wipe", .5), ("fade", .5),
+             ("push_left", .5), ("fade", .5), ("wipe", .5), ("fade", .5), ("flash", .5), ("fade", .5),
+             ("push_left", .5), ("flash", .5), ("zoom", .55), ("fade", .9)]
 if VILLA == "palmarin":
     TRANS = TRANS[:12] + [("fade", .5)] + TRANS[12:]
 starts, t = [], 0.0
@@ -252,7 +266,8 @@ NF = int(round(TOTAL * FPS))
 
 imgs = {}
 for s in SHOTS:
-    imgs[s[0]] = Image.open(f"{PHOTOS}/{s[0]}.jpg").convert("RGB")
+    if s[2] != "clip":
+        imgs[s[0]] = Image.open(f"{PHOTOS}/{s[0]}.jpg").convert("RGB")
 
 # ------------------------------------------------------------------ rendu d'un plan
 def kb_window(iw, ih, p, cfg, aspect):
@@ -289,9 +304,19 @@ def outro_tint():
     return _tint
 
 
+_clip_n = {}
 def render_shot(i, lt):
     name, dur, mode, cfg = SHOTS[i]
     p = clamp(lt / dur)
+    if mode == "clip":
+        if name not in _clip_n:
+            _clip_n[name] = len(glob.glob(f"{CLIP_FRAMES}/{name}/*.jpg"))
+        k = max(0, min(int(lt * FPS), _clip_n[name] - 1))
+        cim = Image.open(f"{CLIP_FRAMES}/{name}/{k:04d}.jpg").convert("RGB")
+        if cim.height != H:                       # 4:5 : recadrage centré dans la hauteur 9:16
+            y0 = (cim.height - H) // 2
+            cim = cim.crop((0, y0, cim.width, y0 + H))
+        return np.asarray(cim)
     im = imgs[name]
     if mode == "fit":
         base = fit_bg(name).copy()
@@ -387,30 +412,37 @@ SX.append((starts[0] + 1.32, sfx.tick(1200), .9, 0))
 add_ev(1, .3, starts[len(SHOTS) - 1] - starts[1] - .1, logo_layer(170, glow=True), 824, P["wm_y"], "rise", left=True)
 
 LY, CY = P["label_y"], P["chip_y"]
+_f = lambda sub: next(i for i, sh in enumerate(SHOTS) if sub in sh[0])
+if VILLA == "palmarin":
+    BEDS, SDB, IPOOL, ILAST = [7, 8, 9, 10], [11, 12, 13], 14, 15
+elif WITH_CLIPS:      # les plans « clip » s'intercalent : on repère les photos par leur nom
+    BEDS = [_f("08_chambre-1"), _f("09_chambre-2"), _f("10_chambre-3"), _f("11_chambre-4")]
+    SDB = [_f("12_salle-de-bain-1"), _f("13_salle-de-bain-2")]
+    IPOOL, ILAST = _f("14_piscine-privee"), _f("15_piscine-et-terrasse")
+else:
+    BEDS, SDB, IPOOL, ILAST = [7, 8, 9, 10], [11, 12], 13, 14
 # Plan 2 : piscine privée
 t = add_ev(1, .45, 2.0, chip("pool", "PISCINE PRIVÉE"), *((500, P["chip1_y"]) if SHOTS[1][2] == "fit" else (540, CY)), "pop"); SX.append((t, sfx.pop(640), 1, 0))
 # Plans 3-7 : espaces de vie
 for i, (tx, sb) in LAB.items():
     t = add_ev(i, .35, 2.0, label(tx, sb), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1500 + 90 * i), .8, -.2))
 # Chambres
-t = add_ev(7, .35, 2.2, chip("bed", "4 CHAMBRES"), 540, CY, "pop"); SX.append((t, sfx.pop(700), 1, 0))
-for n, i in enumerate((7, 8, 9, 10), 1):
-    sub = "Vue piscine" if i == 8 else None
-    t = add_ev(i, .45 if i == 7 else .3, 2.0, label(f"Chambre {n}", sub), 60, LY, "rise", left=True)
+t = add_ev(BEDS[0], .35, 2.2, chip("bed", "4 CHAMBRES"), 540, CY, "pop"); SX.append((t, sfx.pop(700), 1, 0))
+for n, i in enumerate(BEDS, 1):
+    sub = "Vue piscine" if n == 2 else None
+    t = add_ev(i, .45 if n == 1 else .3, 2.0, label(f"Chambre {n}", sub), 60, LY, "rise", left=True)
     SX.append((t, sfx.tick(1400 + 110 * n), .8, -.2))
 # Salles de bain
-t = add_ev(11, .35, 2.2, chip("shower", "3 SALLES DE BAIN"), 540, CY, "pop"); SX.append((t, sfx.pop(760), 1, 0))
-t = add_ev(11, .55, 1.9, label("Salle de bain"), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1700), .8, -.2))
-t = add_ev(12, .30, 2.0, label("Salle de bain"), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1800), .8, -.2))
-PX = 0
-if VILLA == "palmarin":        # 3e salle de bain
-    PX = 1
-    t = add_ev(13, .30, 2.0, label("Salle de bain"), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1900), .8, -.2))
+t = add_ev(SDB[0], .35, 2.2, chip("shower", "3 SALLES DE BAIN"), 540, CY, "pop"); SX.append((t, sfx.pop(760), 1, 0))
+t = add_ev(SDB[0], .55, 1.9, label("Salle de bain"), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1700), .8, -.2))
+t = add_ev(SDB[1], .30, 2.0, label("Salle de bain"), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1800), .8, -.2))
+if len(SDB) > 2:        # 3e salle de bain
+    t = add_ev(SDB[2], .30, 2.0, label("Salle de bain"), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1900), .8, -.2))
 # Piscine
-t = add_ev(13 + PX, .35, 2.5, chip("pool", "PISCINE PRIVÉE", POOL_SUB), 540, CY, "pop"); SX.append((t, sfx.pop(660), 1, 0))
-SX.append((starts[13 + PX] + .1, sfx.water(2.2, .32), 1, 0))
-t = add_ev(14 + PX, .3, 2.2, label(LAST_LABEL), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1500), .8, -.2))
-SX.append((starts[14 + PX] + .2, sfx.water(1.8, .22), 1, .1))
+t = add_ev(IPOOL, .35, 2.5, chip("pool", "PISCINE PRIVÉE", POOL_SUB), 540, CY, "pop"); SX.append((t, sfx.pop(660), 1, 0))
+SX.append((starts[IPOOL] + .1, sfx.water(2.2, .32), 1, 0))
+t = add_ev(ILAST, .3, 2.2, label(LAST_LABEL), 60, LY, "rise", left=True); SX.append((t, sfx.tick(1500), .8, -.2))
+SX.append((starts[ILAST] + .2, sfx.water(1.8, .22), 1, .1))
 
 # Outro : médaillon, critères, (appel à réserver si CTA) — reste affiché jusqu'à la fin
 o = len(SHOTS) - 1; HOLD = 30
