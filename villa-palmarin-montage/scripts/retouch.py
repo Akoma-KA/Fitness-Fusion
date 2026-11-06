@@ -1,5 +1,7 @@
 import sys, os, numpy as np
 from PIL import Image, ImageFilter, ImageEnhance
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from retouch_listing import listing
 
 U="/root/.claude/uploads/164dbbcf-d142-5fe7-9f91-fd4f47a4d8f8/"
 SRC={ # numéro d'origine -> fichier
@@ -65,7 +67,7 @@ if __name__=="__main__":
     pairs=[]
     for i,(n,name,kind) in enumerate(ORDER,1):
         im=Image.open(f"{U}{SRC[n]}-image.jpg"); im=im.convert("RGB")
-        r=retouch(im,kind)
+        r=listing(im,kind)
         r.save(f"{dst}/{i:02d}_{name}.jpg",quality=95,subsampling=0)
         pairs.append((im,r))
     # planche avant/après

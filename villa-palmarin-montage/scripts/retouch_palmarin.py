@@ -1,7 +1,7 @@
 import sys, os, shutil
 from PIL import Image
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from retouch import retouch
+from retouch_listing import listing as retouch
 U = "/root/.claude/uploads/164dbbcf-d142-5fe7-9f91-fd4f47a4d8f8/"
 SRC = dict(enumerate("9a9b7997 b08f75f7 8a4d7ff9 a2948f23 4f008ab5 bfa19ad2 aba3666c 8a1cc3e2 8696cf58 005c5103 6f7d28ef 0cff18a1 fd8322bf e656f60a f0a85bbb ed770c54 351dd2b2 440ab523 c01a8e64 e25e60f0 d0577831".split(), 1))
 # (n° photo, nom, type) — couverture = photo 1, puis ordre logique réseaux/Airbnb/Booking
