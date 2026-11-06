@@ -7,3 +7,9 @@
   - logo (médaillon corail → pêche sur bleu marine), polices Abril Fatface (titres) + Epilogue (texte)
   - couleurs : bleu marine #122267 · corail #FF5F6D · pêche #FFC371
 - `scripts/` : retouch.py, montage.py, sfx.py (`BRAND_DIR=brand python3 scripts/FMT=9x16|4x5 CTA=1|0 python3 scripts/montage.py photos-retouchees sortie.mp4 full`)
+
+## Montages photos + clips vidéo (Lyla Villa)
+- `Lyla-Villa_Instagram-9x16_photos-et-clips_sans-reservation.mp4` (1080x1920) et `Lyla-Villa_Facebook-4x5_photos-et-clips_sans-reservation.mp4` (1080x1350), ~55 s, sans musique
+- `clips-retouches/` : les 7 clips WhatsApp retouchés (lumineux, 1080x1920, sans audio)
+- Régénérer : `python3 scripts/prep_clips.py <dossier_clips> <dossier_frames> clips-retouches` puis
+  `VILLA=lyla CLIPS=1 CLIP_FRAMES=<dossier_frames> FMT=9x16|4x5 CTA=0 BRAND_DIR=brand python3 scripts/montage.py photos-retouchees sortie.mp4 full`
