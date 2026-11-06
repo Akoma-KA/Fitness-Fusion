@@ -12,7 +12,7 @@ ORDER = [(1, "facade-couverture", "ext"), (19, "facade-palmier", "ext"), (4, "sa
          (6, "piscine-jardin", "ext"), (9, "terrasse-piscine", "ext")]
 dst = sys.argv[1]; os.makedirs(dst, exist_ok=True)
 for i, (n, name, kind) in enumerate(ORDER, 1):
-    retouch(Image.open(f"{U}{SRC[n]}-image.jpg").convert("RGB"), kind).save(f"{dst}/{i:02d}_{name}.jpg", quality=95, subsampling=0)
+    retouch(Image.open(f"{U}{SRC[n]}-image.jpg").convert("RGB"), kind).save(f"{dst}/{i:02d}_{name}.jpg", quality=97, subsampling=0)
 # fond de l'écran final : la façade de couverture (même photo)
 shutil.copy(f"{dst}/01_facade-couverture.jpg", f"{dst}/17_facade-fin.jpg")
 print("ok", len(ORDER) + 1)

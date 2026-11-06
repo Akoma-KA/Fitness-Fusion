@@ -68,7 +68,7 @@ if __name__=="__main__":
     for i,(n,name,kind) in enumerate(ORDER,1):
         im=Image.open(f"{U}{SRC[n]}-image.jpg"); im=im.convert("RGB")
         r=listing(im,kind)
-        r.save(f"{dst}/{i:02d}_{name}.jpg",quality=95,subsampling=0)
+        r.save(f"{dst}/{i:02d}_{name}.jpg",quality=97,subsampling=0)
         pairs.append((im,r))
     # planche avant/après
     W=200

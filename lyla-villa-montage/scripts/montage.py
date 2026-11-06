@@ -284,7 +284,7 @@ def kb_window(iw, ih, p, cfg, aspect):
     return (x0, y0, x0 + w, y0 + h)
 
 
-SHARP = ImageFilter.UnsharpMask(radius=1.3, percent=65, threshold=2)
+SHARP = ImageFilter.UnsharpMask(radius=.8, percent=int(os.environ.get("SHARP_PCT", "18")), threshold=3)   # léger : les photos sont déjà nettoyées/affûtées à la retouche
 _bg_cache = {}
 def fit_bg(name):
     if name not in _bg_cache:
@@ -523,6 +523,10 @@ def which(t):
     return len(SHOTS) - 1, None
 
 
+GRAIN = float(os.environ.get("GRAIN", "0"))
+_rng = np.random.default_rng(11)
+
+
 def frame_at(t):
     i, tp = which(t)
     A = render_shot(i, t - starts[i])
@@ -550,6 +554,9 @@ def frame_at(t):
     fr *= (1 - k * GRAD)[:, None, None]
     np.clip(fr, 0, 255, out=fr)
     draw_events(fr, t)
+    if GRAIN > 0:
+        fr += _rng.normal(0, GRAIN, fr.shape[:2]).astype(np.float32)[..., None]
+        np.clip(fr, 0, 255, out=fr)
     return fr.astype(np.uint8)
 
 
@@ -564,12 +571,24 @@ if __name__ == "__main__":
         for tt in [float(x) for x in sys.argv[4].split(",")]:
             Image.fromarray(frame_at(tt)).save(f"{outd}/still_{tt:05.2f}.jpg", quality=90)
         sys.exit()
-    cmd = ["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
-           "-i", wav, "-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-maxrate", "14M",
-           "-bufsize", "28M", "-pix_fmt", "yuv420p", "-profile:v", "high", "-r", str(FPS), "-c:a", "aac", "-b:a", "192k",
-           "-movflags", "+faststart", "-t", f"{TOTAL:.3f}", OUT]
+    # Encodage : conversion RGB -> YUV BT.709 explicite (sinon BT.601 par défaut = couleurs/contours faussés),
+    # x264 « slow », CRF bas, AQ pour les aplats (murs blancs), débit plafonné pour rester < 100 Mo.
+    ENC = os.environ.get("ENC", "new")
+    seg = os.environ.get("SEG")            # "début,fin" en s : rend seulement un extrait (tests), sans audio
+    n0, n1 = (int(float(x) * FPS) for x in seg.split(",")) if seg else (0, NF)
+    cmd = ["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-"]
+    if not seg: cmd += ["-i", wav, "-map", "0:v", "-map", "1:a", "-c:a", "aac", "-b:a", "192k", "-t", f"{TOTAL:.3f}"]
+    if ENC == "old":
+        cmd += ["-c:v", "libx264", "-preset", "medium", "-crf", "18", "-maxrate", "14M", "-bufsize", "28M", "-pix_fmt", "yuv420p", "-profile:v", "high"]
+    else:
+        cmd += ["-vf", "scale=out_color_matrix=bt709:out_range=tv:flags=lanczos+accurate_rnd+full_chroma_int,format=yuv420p",
+                "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv",
+                "-c:v", "libx264", "-preset", os.environ.get("X264_PRESET", "slow"), "-crf", os.environ.get("X264_CRF", "15"),
+                "-profile:v", "high", "-x264-params", "aq-mode=3:psy-rd=1.0,0.0:deblock=-1,-1",
+                "-maxrate", os.environ.get("MAXRATE", "20M"), "-bufsize", "40M", "-g", "60"]
+    cmd += ["-r", str(FPS), "-movflags", "+faststart", OUT]
     pr = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-    for n in range(NF):
+    for n in range(n0, n1):
         pr.stdin.write(frame_at(n / FPS).tobytes())
         if n % 100 == 0:
             print(n, "/", NF, flush=True)
