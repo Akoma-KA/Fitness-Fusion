@@ -13,3 +13,11 @@
 - `clips-retouches/` : les 7 clips WhatsApp retouchés (lumineux, 1080x1920, sans audio)
 - Régénérer : `python3 scripts/prep_clips.py <dossier_clips> <dossier_frames> clips-retouches` puis
   `VILLA=lyla CLIPS=1 CLIP_FRAMES=<dossier_frames> FMT=9x16|4x5 CTA=0 BRAND_DIR=brand python3 scripts/montage.py photos-retouchees sortie.mp4 full`
+
+## Qualité (anti-pixellisation)
+- Photos : déblocage JPEG (`pp7` + `hqdn3d`, lissage de la chrominance) **avant** l'éclaircissement, netteté douce, JPEG qualité 97.
+- Clips : déblocage + débruitage, super-résolution Real-ESRGAN General x4v3 (ONNX, CPU) puis réduction Lanczos vers 1080x1920.
+  Modèle : Hugging Face `tamnvcc/Real-ESRGAN-General-x4v3_float`, fichier `onnx/model.onnx` (non versionné) :
+  `SR_MODEL=chemin/model.onnx python3 scripts/prep_clips.py <clips_source> <frames> clips-retouches`
+- Encodage : conversion RGB→YUV BT.709 explicite, x264 `slow` CRF 15, `aq-mode=3`.
+- `scripts/qa_frames.py` : compare des images de la vidéo encodée à la référence non compressée (SSIM/PSNR + recadrages 1:1).

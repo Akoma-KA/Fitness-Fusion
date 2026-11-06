@@ -43,7 +43,8 @@ def lap_var(a):
 def decode(path, t):
     t = t - float(os.environ.get("QA_OFFSET", "0"))        # extrait rendu avec SEG=début,fin
     tmp = os.path.join(outd, "_dec.png")
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{t:.3f}", "-i", path, "-frames:v", "1", tmp], check=True)
+    k = int(round(t * M.FPS))                                      # image exacte n° k (pas de décalage d'une image)
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", path, "-vf", f"select=eq(n\\,{k})", "-frames:v", "1", "-fps_mode", "passthrough", tmp], check=True)
     return np.asarray(Image.open(tmp).convert("RGB"))
 
 

@@ -5,10 +5,16 @@ Les paramètres de retouche sont estimés une seule fois par clip (image médian
 les images : pas de scintillement. L'audio d'origine est supprimé.
 """
 import os, sys, glob, subprocess, shutil, tempfile
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
 from PIL import Image, ImageFilter, ImageEnhance
 
 FPS = 30
+SR_MODEL = os.environ.get("SR_MODEL")          # chemin du modèle ONNX Real-ESRGAN (super-résolution)
+SRNET = None
+if SR_MODEL:
+    from sr_esrgan import SR
+    SRNET = SR(SR_MODEL, threads=int(os.environ.get("SR_THREADS", "4")))
 OUT_W, OUT_H = 1080, 1920
 # nom de sortie, fichier source (motif), début (s), durée (s)
 CLIPS = [
@@ -48,17 +54,17 @@ def estimate(a, target=.665):
     return dict(gain=gain, g=g, wscale=wscale)
 
 
-def apply(a, P):
+def apply(a, P, blur=12):
     b = np.clip(a * P["gain"], 0, 1)
     c = np.power(np.clip(b, 1e-4, 1), P["g"])
     c = c + (.22 * (1 - lum(c)) ** 2.4)[..., None] * (.55 + .45 * c)
     c = c * P["wscale"]
     c = np.where(c > .86, .86 + (c - .86) * .55, c)
     c = np.clip(c, 0, 1)
-    c = c + .24 * (c - .5) * (1 - np.abs(2 * c - 1))
+    c = c + .20 * (c - .5) * (1 - np.abs(2 * c - 1))
     L = lum(c)
-    B = np.asarray(Image.fromarray((np.clip(L, 0, 1) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(12)), np.float32) / 255.
-    c = np.clip(c + ((L - B) * .44)[..., None], 0, 1)
+    B = np.asarray(Image.fromarray((np.clip(L, 0, 1) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(blur)), np.float32) / 255.
+    c = np.clip(c + ((L - B) * .30)[..., None], 0, 1)
     out = Image.fromarray((c * 255 + .5).astype(np.uint8))
     out = ImageEnhance.Color(out).enhance(1.22)
     hsv = np.asarray(out.convert("HSV"), dtype=np.float32); h = hsv[..., 0] * 360 / 255.
@@ -74,20 +80,29 @@ def main(src, out_frames, out_mp4=None, only=None):
         f = [p for p in glob.glob(os.path.join(src, f"*{pat}.mp4"))][0]
         tmp = tempfile.mkdtemp(prefix="clip_")
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(start), "-t", str(length), "-i", f,
-                        "-vf", f"fps={FPS},hqdn3d=3:2:5:4", "-start_number", "0", os.path.join(tmp, "%04d.png")], check=True)
+                        "-vf", f"fps={FPS},pp7=qp=7:mode=medium,hqdn3d=2:1.5:3:3", "-start_number", "0", os.path.join(tmp, "%04d.png")], check=True)
         pngs = sorted(glob.glob(os.path.join(tmp, "*.png")))
         mid = np.asarray(Image.open(pngs[len(pngs) // 2]).convert("RGB"), np.float32) / 255.
         P = estimate(mid)
         d = os.path.join(out_frames, name); os.makedirs(d, exist_ok=True)
         for i, p in enumerate(pngs):
-            a = np.asarray(Image.open(p).convert("RGB"), np.float32) / 255.
-            im = apply(a, P).resize((OUT_W, OUT_H), Image.LANCZOS).filter(ImageFilter.UnsharpMask(radius=1.6, percent=70, threshold=2))
-            im.save(os.path.join(d, f"{i:04d}.jpg"), quality=93, subsampling=0)
+            outp = os.path.join(d, f"{i:04d}.jpg")
+            if os.path.exists(outp): continue                     # reprise possible
+            nat = Image.open(p).convert("RGB")
+            if SR_MODEL:
+                big = Image.fromarray(SRNET.x4(np.asarray(nat))).resize((OUT_W, OUT_H), Image.LANCZOS)   # x4 puis réduction nette
+                im = apply(np.asarray(big, np.float32) / 255., P, blur=27)
+            else:
+                a = np.asarray(nat, np.float32) / 255.
+                im = apply(a, P).resize((OUT_W, OUT_H), Image.LANCZOS).filter(ImageFilter.UnsharpMask(radius=1.2, percent=25, threshold=3))
+            im.save(outp, quality=95, subsampling=0)
         shutil.rmtree(tmp)
         if out_mp4:
             os.makedirs(out_mp4, exist_ok=True)
             subprocess.run(["ffmpeg", "-v", "error", "-y", "-framerate", str(FPS), "-i", os.path.join(d, "%04d.jpg"),
-                            "-c:v", "libx264", "-crf", "17", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                            "-vf", "scale=out_color_matrix=bt709:out_range=tv:flags=lanczos+accurate_rnd+full_chroma_int,format=yuv420p",
+                            "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709",
+                            "-c:v", "libx264", "-preset", "slow", "-crf", "15", "-movflags", "+faststart",
                             os.path.join(out_mp4, name + ".mp4")], check=True)
         print(name, len(pngs), "images", "gamma %.2f" % P["g"], "wscale %.2f" % P["wscale"], flush=True)
 
