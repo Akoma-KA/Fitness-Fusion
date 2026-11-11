@@ -6,3 +6,5 @@ Ordre des photos (logique Airbnb/Booking) : 01 salon · 02 salon & salle à mang
 - **Provisoires** : 05, 06, 07 (chambres 2 à 4) — lits habillés par montage local (drap blanc, oreillers, serviettes) et objets retirés par retouche locale. À remplacer, sous le même nom, par les versions générées par l'IA de Canva (liens MAHamrF1NAU, MAHamgjXI2I, MAHamr3B0Hs) dès que les images complètes sont envoyées.
 - Les lits et objets modifiés sont des modifications virtuelles : Airbnb et Booking demandent des photos fidèles au logement → habiller réellement les lits, ou refaire les photos une fois les lits faits.
 - Scripts : `scripts/process_photos.py`, `scripts/beds_provisoires.py`, `scripts/stage_bed.py` (retouche : `lyla-villa-montage/scripts/retouch_listing.py`).
+
+Retouche : pièces à vivre (01, 02, 03) en rendu **naturel** (noirs conservés, blancs neutres, éclairage modéré) ; chambres et salle de bain en rendu « annonce » plus lumineux (`retouch_listing.py`, style `natural` / `listing`).

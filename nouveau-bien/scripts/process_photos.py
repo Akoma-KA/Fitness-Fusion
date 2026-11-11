@@ -13,13 +13,17 @@ JOBS = {
     "08_salle-de-bain": "6eebdf43",
 }
 
+# pièces à vivre : rendu naturel ; salle de bain : rendu annonce
+STYLE = {"01_salon": "natural", "02_salon-salle-a-manger": "natural", "03_cuisine-salle-a-manger": "natural"}
+
+
 def run(dst, only=None, pre=None):
     os.makedirs(dst, exist_ok=True)
     for name, f in JOBS.items():
         if only and name not in only: continue
         im = Image.open(f"{U}{f}-image.jpg").convert("RGB")
         if pre and name in pre: im = pre[name](im)
-        listing(im, "int").save(f"{dst}/{name}.jpg", quality=97, subsampling=0)
+        listing(im, "int", style=STYLE.get(name, "listing")).save(f"{dst}/{name}.jpg", quality=97, subsampling=0)
         print("ok", name, flush=True)
 
 def crop_person(im):
