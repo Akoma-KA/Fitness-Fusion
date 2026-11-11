@@ -104,6 +104,16 @@ def _assets():
         d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets")
         ld = lambda n: cv2.cvtColor(cv2.imread(os.path.join(d, n + ".png"), cv2.IMREAD_UNCHANGED), cv2.COLOR_BGRA2RGBA).astype(np.float32) / 255.
         ASSETS = dict(pg=ld("oreiller_gauche"), pd=ld("oreiller_droit"), tw=ld("serviettes_blanche_bleue"))
+        mp = os.environ.get("SR_MODEL")
+        if mp and os.path.exists(mp):
+            sys_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "lyla-villa-montage", "scripts")
+            import sys; sys.path.insert(0, sys_path)
+            from sr_esrgan import SR
+            net = SR(mp)
+            for k, a in list(ASSETS.items()):
+                rgb = net.x4((a[..., :3] * 255 + .5).astype(np.uint8)).astype(np.float32) / 255.
+                al = cv2.resize(a[..., 3], (rgb.shape[1], rgb.shape[0]), interpolation=cv2.INTER_CUBIC)
+                ASSETS[k] = np.dstack([rgb, np.clip(al, 0, 1)])
     return ASSETS
 
 
@@ -146,13 +156,20 @@ def add_towels(img, quad, pos=(.50, .56), seed=3):
     return place_asset(out, As["tw"], P(pos[0] + .20, pos[1] + .02), width=w, angle=ang - 3, gain=1.0, flip=True, shadow=(4, 6), shadow_amt=.30)
 
 
-def dress_bed(img, quad, drop=68, seed=3, pillows=True, towels=True, towel_pos=((.34, .60), (.66, .60)), pillow_rise=34):
+def dress_bed(img, quad, drop=68, seed=3, pillows=True, towels=True, towel_pos=((.34, .60), (.66, .60)), pillow_rise=34, protect_dark=0.0, protect_polys=()):
     base = np.asarray(img.convert("RGB"), np.float32) / 255.
     out, top, sides = whiten(base, quad, drop=drop, seed=seed)
     out = _fold_and_creases(out, quad, top, seed)
     if pillows: out = add_pillows(out, quad, seed=seed, rise=pillow_rise)
     if towels:
         out = add_towels(out, quad, pos=(.50, .58), seed=seed)
+    if protect_dark > 0 or protect_polys:                       # objets devant le lit (lampe...) : on garde l'original
+        lum_o = base.mean(-1)
+        keep = np.zeros(base.shape[:2], np.float32)
+        if protect_dark > 0: keep = np.maximum(keep, (lum_o < protect_dark).astype(np.float32))
+        for pp in protect_polys: keep = np.maximum(keep, _poly_mask(base.shape[:2], pp))
+        keep = cv2.GaussianBlur(keep, (0, 0), 1.2)[..., None]
+        out = out * (1 - keep) + base * keep
     return Image.fromarray((np.clip(out, 0, 1) * 255 + .5).astype(np.uint8))
 
 
